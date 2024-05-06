@@ -8,7 +8,6 @@ use App\Models\Counter;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
-// updateeee 6-5-24
 class CustomerQueueController extends Controller
 {
     public function store(Request $request)
