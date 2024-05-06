@@ -8,6 +8,7 @@ use App\Models\Counter;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
+// try test
 class CustomerQueueController extends Controller
 {
     public function store(Request $request)
