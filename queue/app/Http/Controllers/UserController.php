@@ -19,7 +19,7 @@ class UserController extends Controller
             'name' => 'required',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
-            'confirm_password' => 'required|same:password',
+            //'confirm_password' => 'required|same:password',
         ]);
 
         // if validation fails, return validation errors
