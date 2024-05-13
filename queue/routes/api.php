@@ -3,10 +3,10 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\StaffController;
 use App\Http\Controllers\CounterController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\DepartmentCounterController;
 use App\Http\Controllers\CustomerQueueController;
-
 
 // users
 Route::post('signup', [UserController::class, 'signup']);
@@ -18,25 +18,24 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 Route::middleware('auth:sanctum')->post('logout', [UserController::class, 'logout']);
 
-// Route::post('staff', [StaffController::class, 'store']);
-
-// Route::post('counters', [CounterController::class, 'store']);
-
-// staffs
-Route::post('add-staff', [StaffController::class, 'store']);
-Route::get('staff/{id}', [StaffController::class, 'show']);
-Route::get('staff', [StaffController::class, 'index']);
-
 // counters
 Route::post('add-counters', [CounterController::class, 'store']);
-Route::get('counters/{id}', [CounterController::class, 'show']);
 Route::get('counters', [CounterController::class, 'index']);
+Route::delete('/counters/{counters}', [CounterController::class, 'delete']);
+
+// departments
+Route::post('add-departments', [DepartmentController::class, 'store']);
+Route::get('departments', [DepartmentController::class, 'index']);
+Route::delete('/departments/{department}', [DepartmentController::class, 'delete']);
+
+// department_counters
+Route::post('add-department-counters', [DepartmentCounterController::class, 'store']);
 
 // customer_queues
 Route::post('customer-queues/generate', [CustomerQueueController::class, 'store']);
-Route::put('/mark-as-serviced/{queue}', [CustomerQueueController::class, 'markAsServiced'])->name('mark-as-serviced');
+Route::put('/call-queue/{queue}/{department_id}/{counter_id}', [CustomerQueueController::class, 'callQueue'])->name('call-queue');
 Route::post('/update-current-queue', [CustomerQueueController::class, 'updateCurrentQueue'])->name('update-current-queue');
-
+Route::post('customer-queue/pass/{queue_number}/{new_department_id}', [CustomerQueueController::class, 'passQueue'])->name('pass-queue');
 
 
 

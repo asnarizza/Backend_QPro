@@ -2,23 +2,23 @@
 
 namespace Database\Seeders;
 
-use App\Models\Counter;
+use App\Models\Department;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
-class CounterSeeder extends Seeder
+class DepartmentSeeder extends Seeder
 {
     /**
      * Run the database seeds.
      */
     public function run(): void
     {
-        Counter::factory()->create([
-            'name' => 'Counter 1',
+        Department::factory()->create([
+            'name' => 'Pharmacy',
         ]);
 
-        Counter::factory()->create([
-            'name' => 'Counter 2',
+        Department::factory()->create([
+            'name' => 'Radiology',
         ]);
     }
 }

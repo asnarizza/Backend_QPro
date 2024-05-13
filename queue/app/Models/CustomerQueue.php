@@ -9,12 +9,12 @@ class CustomerQueue extends Model
 {
     protected $fillable = [
         'user_id',
+        'department_id',
         'counter_id',
         'queue_number',
         'current_queue',
         'joined_at',
         'serviced_at',
-        'last_generated_at',
         'last_reset_date',
     ];
 

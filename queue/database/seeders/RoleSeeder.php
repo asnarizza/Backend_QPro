@@ -2,23 +2,23 @@
 
 namespace Database\Seeders;
 
-use App\Models\Counter;
+use App\Models\Role;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
-class CounterSeeder extends Seeder
+class RoleSeeder extends Seeder
 {
     /**
      * Run the database seeds.
      */
     public function run(): void
     {
-        Counter::factory()->create([
-            'name' => 'Counter 1',
+        Role::factory()->create([
+            'name' => 'Admin',
         ]);
 
-        Counter::factory()->create([
-            'name' => 'Counter 2',
+        Role::factory()->create([
+            'name' => 'Staff',
         ]);
     }
 }

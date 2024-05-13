@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Counter;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class CounterController extends Controller
 {
@@ -15,12 +16,25 @@ class CounterController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'type' => 'required|string',
-            'staff_id' => 'required|exists:staff,id',
+            'name' => 'required|string',
         ]);
 
         return Counter::create($request->all());
     }
+
+    public function delete($id)
+    {
+        $counter = Counter::find($id);
+
+        if (!$counter) {
+            return response()->json(['message' => 'Counter not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $counter->delete();
+
+        return response()->json(['message' => 'Counter deleted successfully'], Response::HTTP_OK);
+    }
+
     /**
      * Display the specified resource.
      */
@@ -45,11 +59,5 @@ class CounterController extends Controller
         //
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Counter $counter)
-    {
-        //
-    }
+    
 }

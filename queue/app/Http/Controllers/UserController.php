@@ -17,6 +17,7 @@ class UserController extends Controller
         $validator = Validator::make($request->all(), 
         [
             'name' => 'required',
+            'phone' => 'required|numeric', 
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
             //'confirm_password' => 'required|same:password',
@@ -41,6 +42,7 @@ class UserController extends Controller
         // generate authentication token for user
         $success['token'] =$user->createToken('auth_token')->plainTextToken;
         $success['name'] =$user->name;
+        $success['phone'] = $user->phone;
 
         // return success response with user details
         return response()->json(
@@ -62,6 +64,7 @@ class UserController extends Controller
             // generate authentication token for user
             $success['token'] = $auth-> createToken('auth_token')->plainTextToken;
             $success['name'] = $auth->name;
+            $success['phone'] = $auth->phone;
             $success['email'] = $auth->email;
 
             // return success response with token and user details

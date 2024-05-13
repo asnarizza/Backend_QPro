@@ -17,13 +17,15 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id');
             $table->foreign('user_id')->references('id')->on('users');
 
-            $table->unsignedBigInteger('counter_id');
+            $table->unsignedBigInteger('department_id');
+            $table->foreign('department_id')->references('id')->on('departments');
+
+            $table->unsignedBigInteger('counter_id')->nullable();
             $table->foreign('counter_id')->references('id')->on('counters');
             
             $table->string('queue_number');
             $table->unsignedInteger('current_queue')->default(1);
-            $table->timestamp('last_generated_at')->nullable();
-
+            
             $table->timestamp('joined_at')->nullable(); 
             $table->timestamp('serviced_at')->nullable();
 
