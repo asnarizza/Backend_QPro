@@ -38,5 +38,3 @@ Route::post('/update-current-queue', [CustomerQueueController::class, 'updateCur
 Route::post('customer-queue/pass/{queue_number}/{new_department_id}', [CustomerQueueController::class, 'passQueue'])->name('pass-queue');
 
 
-
-

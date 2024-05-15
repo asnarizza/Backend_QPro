@@ -24,7 +24,8 @@ return new class extends Migration
             $table->foreign('counter_id')->references('id')->on('counters');
             
             $table->string('queue_number');
-            $table->unsignedInteger('current_queue')->default(1);
+            $table->unsignedInteger('current_queue')->nullable();
+            $table->unsignedInteger('next_queue')->nullable();
             
             $table->timestamp('joined_at')->nullable(); 
             $table->timestamp('serviced_at')->nullable();

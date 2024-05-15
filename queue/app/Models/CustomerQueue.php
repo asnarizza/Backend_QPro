@@ -13,6 +13,7 @@ class CustomerQueue extends Model
         'counter_id',
         'queue_number',
         'current_queue',
+        'next_queue',
         'joined_at',
         'serviced_at',
         'last_reset_date',

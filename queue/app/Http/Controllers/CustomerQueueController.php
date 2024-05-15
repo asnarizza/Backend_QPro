@@ -10,6 +10,7 @@ use Carbon\Carbon;
 
 class CustomerQueueController extends Controller
 {
+
     public function store(Request $request)
     {
         // Validate request data
@@ -28,30 +29,42 @@ class CustomerQueueController extends Controller
         // Get today's date
         $today = Carbon::today()->toDateString();
 
-        // Count the number of queues for today
-        $queueCount = CustomerQueue::whereDate('created_at', $today)
-            ->where('department_id', $department->id)
-            ->count();
+        // Get the maximum queue number for the department
+        $maxQueueNumber = CustomerQueue::where('department_id', $department->id)
+            ->whereDate('created_at', $today)
+            ->max('queue_number');
 
         // Generate the queue number based on department
-        $queueNumber = ($department->id * 1000) + $queueCount + 1;
+        $queueNumber = $maxQueueNumber ? $maxQueueNumber + 1 : ($department->id * 1000) + 1;
 
-        // Get the current queue for the department
-        $currentQueue = ($department->id * 1000) + 1;
+       // Find the last serviced queue for this department
+        $lastServicedQueue = CustomerQueue::where('department_id', $department->id)
+        ->whereNotNull('serviced_at')
+        ->orderBy('created_at', 'desc')
+        ->first();
 
-    //    // Set the current queue to the next available number after the last serviced queue
-    //     $lastServicedQueue = CustomerQueue::whereNotNull('serviced_at')
-    //     ->orderBy('created_at', 'desc')
-    //     ->first();
+        if ($lastServicedQueue) {
+            $currentQueue = $lastServicedQueue->queue_number;
+            $nextQueueNumber = CustomerQueue::where('department_id', $department->id)
+            ->whereDate('created_at', $today)
+            ->whereNull('serviced_at')
+            ->where('queue_number', '>', $currentQueue)
+            ->min('queue_number');
+        $nextQueue = $nextQueueNumber ?: null;
+        } else {
+            // If no queues have been serviced for this department yet,
+            // set both current_queue and next_queue to null
+            $currentQueue = null;
+            $nextQueue = null;
+        }
 
-    //     $currentQueue = $lastServicedQueue ? $lastServicedQueue->current_queue + 1 : 1001;
-
-        // Create the customer queue
+        // Create the customer queue with current_queue and next_queue values
         $customerQueue = CustomerQueue::create([
             'user_id' => $request->user_id,
             'department_id' => $request->department_id,
             'queue_number' => $queueNumber,
             'current_queue' => $currentQueue,
+            'next_queue' => $nextQueue,
             'joined_at' => now(),
         ]);
 
@@ -66,34 +79,6 @@ class CustomerQueueController extends Controller
         ], 201);
     }
 
-    // private function updateCurrentQueue()
-    // {
-    //     // Find the last serviced queue
-    //     $lastServicedQueue = CustomerQueue::whereNotNull('serviced_at')
-    //         ->orderBy('created_at', 'desc')
-    //         ->first();
-
-    //     if ($lastServicedQueue) {
-    //         // Check if the last serviced queue was created on the current date
-    //         $isSameDay = Carbon::parse($lastServicedQueue->created_at)->isSameDay(Carbon::today());
-
-    //         if (!$isSameDay) {
-    //             // If the last serviced queue is from a different day, set current_queue to 1001 for new entries
-    //             CustomerQueue::whereNull('serviced_at')
-    //                 ->whereDate('created_at', Carbon::today())
-    //                 ->update(['current_queue' => 1001]);
-    //         } else {
-    //             // Increment the current queue for all subsequent unserviced queues from the same day
-    //             $unservicedQueues = CustomerQueue::whereNull('serviced_at')
-    //                 ->whereDate('created_at', Carbon::today())
-    //                 ->get();
-    //             foreach ($unservicedQueues as $unservicedQueue) {
-    //                 $unservicedQueue->update(['current_queue' => $lastServicedQueue->current_queue + 1]);
-    //             }
-    //         }
-    //     }
-    // }
-
     private function updateCurrentQueue()
     {
         // Get all departments
@@ -107,24 +92,27 @@ class CustomerQueueController extends Controller
                 ->first();
 
             if ($lastServicedQueue) {
-                // Set current queue to the next available number after the last serviced queue
-                $currentQueue = $lastServicedQueue->queue_number + 1;
+                // Get the next queue number after the last serviced queue
+                $nextQueueNumber = CustomerQueue::where('department_id', $department->id)
+                    ->whereDate('created_at', $lastServicedQueue->created_at)
+                    ->whereNull('serviced_at')
+                    ->where('queue_number', '>', $lastServicedQueue->queue_number)
+                    ->min('queue_number');
 
                 // Update the current queue for all subsequent unserviced queues for this department
                 CustomerQueue::where('department_id', $department->id)
                     ->whereNull('serviced_at')
-                    ->update(['current_queue' => $currentQueue]);
-            } else {
-                // If no queues have been serviced for this department yet, set current queue to department's base number
-                $currentQueue = ($department->id * 1000) + 1;
+                    ->where('queue_number', '>=', $nextQueueNumber)
+                    ->update(['current_queue' => $lastServicedQueue->queue_number, 'next_queue' => $nextQueueNumber]);
+                } else {
 
-                // Update the current queue for all queues for this department
+                // If no queues have been serviced for this department yet,
+                // set current queue to null
                 CustomerQueue::where('department_id', $department->id)
-                    ->update(['current_queue' => $currentQueue]);
+                ->update(['current_queue' => null, 'next_queue' => null]);
             }
         }
     }
-
 
     private function updateLastResetDate()
     {
@@ -140,16 +128,16 @@ class CustomerQueueController extends Controller
         }
     }
 
-    // Example method to mark a queue as serviced using queue_number
-    public function callQueue(string $queueNumber, int $counterId)
+    public function callQueue(string $queueNumber, int $departmentId, int $counterId)
     {
         $queue = CustomerQueue::where('queue_number', $queueNumber)
             ->whereDate('created_at', Carbon::today())
+            ->whereNull('serviced_at')
             ->first();
 
         if (!$queue) {
             return response()->json([
-                'error' => 'Queue not found',
+                'error' => 'Queue not found or already served',
             ], 404);
         }
 
@@ -159,8 +147,23 @@ class CustomerQueueController extends Controller
             'counter_id' => $counterId,
         ]);
 
-         // Update current queue
-        $this->updateCurrentQueue();
+        // Get the next queue in line based on created_at timestamp
+        $nextQueue = CustomerQueue::where('department_id', $departmentId)
+            ->whereDate('created_at', Carbon::today())
+            ->whereNull('serviced_at')
+            ->where('created_at', '>', $queue->created_at)
+            ->orderBy('created_at', 'asc')
+            ->first();
+
+        $nextQueueNumber = $nextQueue ? $nextQueue->queue_number : null;
+
+        // Update the current_queue and next_queue for all unserviced queues
+        CustomerQueue::where('department_id', $departmentId)
+            ->whereNull('serviced_at')
+            ->update([
+                'current_queue' => $queueNumber,
+                'next_queue' => $nextQueueNumber
+            ]);
 
         $updatedQueue = CustomerQueue::where('queue_number', $queueNumber)
             ->whereDate('created_at', Carbon::today())
@@ -171,44 +174,6 @@ class CustomerQueueController extends Controller
             'queue' => $updatedQueue
         ], 200);
     }
-
-    // public function passQueue(Request $request, string $queueNumber, int $newDepartmentId)
-    // {
-    //     // Find the queue
-    //     $queue = CustomerQueue::where('queue_number', $queueNumber)
-    //         ->whereDate('created_at', Carbon::today())
-    //         ->first();
-
-    //     if (!$queue) {
-    //         return response()->json([
-    //             'error' => 'Queue not found',
-    //         ], 404);
-    //     }
-
-    //     // Get the new department
-    //     $newDepartment = Department::find($newDepartmentId);
-
-    //     if (!$newDepartment) {
-    //         return response()->json(['error' => 'Department not found'], 404);
-    //     }
-
-    //     // Update the queue with the new department ID
-    //     $queue->update([
-    //         'department_id' => $newDepartmentId,
-    //     ]);
-
-    //     // Update the current queue for the new department
-    //     $this->updateCurrentQueue();
-
-    //     $updatedQueue = CustomerQueue::where('queue_number', $queueNumber)
-    //         ->whereDate('created_at', Carbon::today())
-    //         ->first();
-
-    //     return response()->json([
-    //         'message' => 'Queue passed to ' . $newDepartment->name,
-    //         'queue' => $updatedQueue
-    //     ], 200);
-    // }
 
     public function passQueue(Request $request, string $queueNumber, int $newDepartmentId)
     {
@@ -233,12 +198,16 @@ class CustomerQueueController extends Controller
         // Set the department property
         $this->department = $newDepartment;
 
-        // Create a new queue for the new department with the same customer_id and queue_number as the original queue
+        // Create a new queue for the new department with the same customer_id and 
+        // queue_number as the original queue
         $newQueue = new CustomerQueue([
             'user_id' => $originalQueue->user_id,
             'queue_number' => $originalQueue->queue_number,
             'department_id' => $newDepartment->id,
         ]);
+
+        // Set the joined_at value for the new queue
+        $newQueue->joined_at = now();
 
         // Save the new queue
         $newQueue->save();
