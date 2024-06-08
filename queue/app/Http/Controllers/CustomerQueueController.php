@@ -66,6 +66,7 @@ class CustomerQueueController extends Controller
             'current_queue' => $currentQueue,
             'next_queue' => $nextQueue,
             'joined_at' => now(),
+            'status' => CustomerQueue::STATUS_WAITING,
         ]);
 
         // Update current queue
@@ -130,6 +131,15 @@ class CustomerQueueController extends Controller
 
     public function callQueue(string $queueNumber, int $departmentId, int $counterId)
     {
+        // Check if there are any queues for the current day
+        $queuesToday = CustomerQueue::whereDate('created_at', Carbon::today())->exists();
+
+        if (!$queuesToday) {
+            return response()->json([
+                'message' => 'There are no queues yet for the new day.',
+            ], 200);
+        }
+
         $queue = CustomerQueue::where('queue_number', $queueNumber)
             ->whereDate('created_at', Carbon::today())
             ->whereNull('serviced_at')
@@ -145,7 +155,15 @@ class CustomerQueueController extends Controller
         $queue->update([
             'serviced_at' => now(),
             'counter_id' => $counterId,
+            'status' => CustomerQueue::STATUS_SERVICED, 
         ]);
+
+        // Update the status of the queues preceding the called queue to "on hold"
+        CustomerQueue::where('department_id', $departmentId)
+            ->whereDate('created_at', Carbon::today())
+            ->whereNull('serviced_at')
+            ->where('queue_number', '<', $queueNumber)
+            ->update(['status' => CustomerQueue::STATUS_ON_HOLD]);
 
         // Get the next queue in line based on created_at timestamp
         $nextQueue = CustomerQueue::where('department_id', $departmentId)
@@ -171,7 +189,8 @@ class CustomerQueueController extends Controller
 
         return response()->json([
             'message' => 'Calling for ' . $queueNumber,
-            'queue' => $updatedQueue
+            'queue' => $updatedQueue,
+            'next_queue' => $nextQueueNumber
         ], 200);
     }
 
@@ -224,4 +243,31 @@ class CustomerQueueController extends Controller
             'queue' => $updatedQueue
         ], 200);
     }
+
+    public function getCurrentQueueByDepartment($departmentId)
+    {
+        // Find the department
+        $department = Department::find($departmentId);
+    
+        if (!$department) {
+            return response()->json(['error' => 'Department not found'], 404);
+        }
+    
+        // Get the first queue number for the department
+        $queues = CustomerQueue::where('department_id', $department->id)
+            ->whereNull('serviced_at')
+            ->orderBy('created_at', 'asc')
+            ->get(['queue_number']);
+    
+        if ($queues->isEmpty()) {
+            return response()->json(['message' => 'No current queue found for this department'], 200);
+        }
+    
+        // Return the department ID and first queue number in the response
+        return response()->json([
+            'queues' => $queues->pluck('queue_number')
+        ], 200);
+    }
+    
+
 }

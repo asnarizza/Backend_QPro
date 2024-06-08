@@ -14,9 +14,10 @@ return new class extends Migration
         Schema::create('department_counters', function (Blueprint $table) {
             $table->id();
 
-            $table->unsignedBigInteger('staff_id');
+            // Define staff_id with nullable constraint
+            $table->unsignedBigInteger('staff_id')->nullable();
             $table->foreign('staff_id')->references('id')->on('users');
-
+            
             $table->unsignedBigInteger('department_id');
             $table->foreign('department_id')->references('id')->on('departments');
 

@@ -29,6 +29,7 @@ return new class extends Migration
             
             $table->timestamp('joined_at')->nullable(); 
             $table->timestamp('serviced_at')->nullable();
+            $table->string('status')->nullable();
 
             $table->date('last_reset_date')->nullable();
 

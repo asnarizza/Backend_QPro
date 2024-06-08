@@ -20,7 +20,7 @@ class UserController extends Controller
             'phone' => 'required|numeric', 
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
-            //'confirm_password' => 'required|same:password',
+            'role_id' => 'nullable|int',
         ]);
 
         // if validation fails, return validation errors
@@ -41,6 +41,7 @@ class UserController extends Controller
 
         // generate authentication token for user
         $success['token'] =$user->createToken('auth_token')->plainTextToken;
+        $success['user_id'] = $user->id;
         $success['name'] =$user->name;
         $success['phone'] = $user->phone;
 
@@ -63,9 +64,11 @@ class UserController extends Controller
 
             // generate authentication token for user
             $success['token'] = $auth-> createToken('auth_token')->plainTextToken;
+            $success['user_id'] = $auth->id;
             $success['name'] = $auth->name;
             $success['phone'] = $auth->phone;
             $success['email'] = $auth->email;
+            $success['role_id'] = $auth->role_id;
 
             // return success response with token and user details
             return response()->json([
@@ -85,51 +88,36 @@ class UserController extends Controller
         }
     }
 
-    // public function logout(Request $request)
-    // {
-    //     // Check if the user is authenticated
-    //     if (Auth::check()) {
-    //         // Revoke the user's current token
-    //         $request->user()->currentAccessToken()->delete();
-
-    //         // Return a success response
-    //         return response()->json([
-    //             'success' => true,
-    //             'message' => 'Logout Successful',
-    //         ]);
-    //     } else {
-    //         // If the user is not authenticated, return an error response
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'User is not authenticated',
-    //         ]);
-    //     }
-    // }
-
     public function logout(Request $request)
-{
-    // Check if the user is authenticated
-    if (Auth::check()) {
-        // Revoke the user's current token
-        $request->user()->currentAccessToken()->delete();
+    {
+        // Check if the user is authenticated
+        if (Auth::check()) {
+            // Revoke the user's current token
+            $request->user()->currentAccessToken()->delete();
 
-        // Log successful logout
-        Log::info('User logged out successfully: ' . $request->user()->id);
+            // Log successful logout
+            Log::info('User logged out successfully: ' . $request->user()->id);
 
-        // Return a success response
-        return response()->json([
-            'success' => true,
-            'message' => 'Logout Successful',
-        ]);
-    } else {
-        // If the user is not authenticated, log an error
-        Log::error('User is not authenticated for logout');
+            // Return a success response
+            return response()->json([
+                'success' => true,
+                'message' => 'Logout Successful',
+            ]);
+        } else {
+            // If the user is not authenticated, log an error
+            Log::error('User is not authenticated for logout');
 
-        // Return an error response
-        return response()->json([
-            'success' => false,
-            'message' => 'User is not authenticated',
-        ]);
+            // Return an error response
+            return response()->json([
+                'success' => false,
+                'message' => 'User is not authenticated',
+            ]);
+        }
     }
-}
+
+    public function getStaff()
+    {
+        $staff = User::where('role_id', 2)->get();
+        return response()->json($staff);
+    }
 }

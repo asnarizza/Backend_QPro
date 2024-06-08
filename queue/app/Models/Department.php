@@ -9,5 +9,14 @@ class Department extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name'];
+    protected $fillable = [
+        'name',
+        'qr_code', 
+    ];
+
+    public function departmentCounters()
+    {
+        return $this->hasMany(DepartmentCounter::class);
+    }
+
 }

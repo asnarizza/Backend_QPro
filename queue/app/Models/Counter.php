@@ -11,4 +11,9 @@ class Counter extends Model
 
     protected $fillable = ['name'];
 
+    public function departmentCounters()
+    {
+        return $this->hasMany(DepartmentCounter::class);
+    }
+
 }

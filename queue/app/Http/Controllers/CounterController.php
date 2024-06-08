@@ -16,10 +16,27 @@ class CounterController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string',
+            'name' => 'nullable|string',
         ]);
 
-        return Counter::create($request->all());
+        //return Counter::create($request->all());
+
+        // Get the count of existing counters
+        $counterCount = Counter::count();
+
+        // Increment the count by 1 for the new counter
+        $counterCount++;
+
+        // Set the name of the new counter
+        $request->merge([
+            'name' => 'Counter ' . $counterCount
+        ]);
+
+        // Create and save the new counter
+        $counter = Counter::create($request->all());
+
+        // Return the created counter
+        return $counter;
     }
 
     public function delete($id)

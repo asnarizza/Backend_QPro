@@ -23,7 +23,7 @@ class DatabaseSeeder extends Seeder
             //'role_id' => '',
             'phone' => '01161636065',
             'email' => 'wafir@gmail.com',
-            'password' => 'abc12345'
+            'password' => 'wafir1234'
         ]);
 
         User::factory()->create([
@@ -31,7 +31,7 @@ class DatabaseSeeder extends Seeder
             'role_id' => '1',
             'phone' => '0194096544',
             'email' => 'rose@gmail.com',
-            'password' => 'rose1234'
+            'password' => 'admin1234'
         ]);
 
         User::factory()->create([
@@ -39,7 +39,7 @@ class DatabaseSeeder extends Seeder
             'role_id' => '2',
             'phone' => '0177923193',
             'email' => 'yana@gmail.com',
-            'password' => 'yana1234'
+            'password' => 'staff1234'
         ]);
 
     }
