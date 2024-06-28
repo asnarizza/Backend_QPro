@@ -34,8 +34,20 @@ class CustomerQueueController extends Controller
             ->whereDate('created_at', $today)
             ->max('queue_number');
 
+        // Calculate the total people ahead
+        $totalPeopleAhead = CustomerQueue::where('department_id', $department->id)
+            ->whereDate('created_at', $today)
+            ->whereNull('serviced_at')
+            ->count();
+        
         // Generate the queue number based on department
         $queueNumber = $maxQueueNumber ? $maxQueueNumber + 1 : ($department->id * 1000) + 1;
+
+        // Calculate the average service time for the department
+        $averageServiceTime = $this->calculateAverageServiceTime($department->id);
+
+        // Estimate the waiting time
+        $estimatedWaitingTime = floor($totalPeopleAhead * $averageServiceTime);
 
        // Find the last serviced queue for this department
         $lastServicedQueue = CustomerQueue::where('department_id', $department->id)
@@ -68,6 +80,7 @@ class CustomerQueueController extends Controller
             'joined_at' => now(),
             'status' => CustomerQueue::STATUS_WAITING,
         ]);
+        
 
         // Update current queue
         $this->updateCurrentQueue();
@@ -76,8 +89,30 @@ class CustomerQueueController extends Controller
         // Return the generated queue number and average service time
         return response()->json([
             'queue_number' => $queueNumber,
-            //'average_service_time' => $averageServiceTime,
+            'total_people_ahead' => $totalPeopleAhead,
+            'estimated_waiting_time' => $estimatedWaitingTime,
         ], 201);
+    }
+
+    private function calculateAverageServiceTime(int $departmentId): float
+    {
+        // Get the serviced queues for the department
+        $servicedQueues = CustomerQueue::where('department_id', $departmentId)
+            ->whereNotNull('serviced_at')
+            ->get();
+    
+        // Calculate the total service time
+        $totalServiceTime = $servicedQueues->reduce(function ($carry, $item) {
+            $servicedAt = $item->serviced_at ? Carbon::parse($item->serviced_at) : null;
+            $joinedAt = $item->joined_at ? Carbon::parse($item->joined_at) : null;
+            return $carry + ($servicedAt ? $servicedAt->diffInSeconds($joinedAt) : 0);
+        }, 0);
+    
+        // Convert the total service time to minutes and round down to the nearest minute
+        $totalServiceTimeInMinutes = floor($totalServiceTime / 60);
+
+        // Calculate the average service time
+        return $servicedQueues->count() > 0 ? ($totalServiceTimeInMinutes / $servicedQueues->count()) : 0;
     }
 
     private function updateCurrentQueue()
@@ -269,5 +304,150 @@ class CustomerQueueController extends Controller
         ], 200);
     }
     
+
+    // // admin
+    // public function getDepartmentStatistics(Request $request, $departmentId)
+    // {
+    //     // Validate the department ID
+    //     $department = Department::find($departmentId);
+
+    //     if (!$department) {
+    //         return response()->json(['error' => 'Department not found'], 404);
+    //     }
+
+    //     // Get today's date
+    //     $today = Carbon::today()->toDateString();
+
+    //     // Get statistics for each counter in the department
+    //     $counters = CustomerQueue::where('department_id', $department->id)
+    //         ->whereNotNull('counter_id')
+    //         ->get()
+    //         ->groupBy('counter_id');
+
+    //     $statistics = $counters->map(function ($queues, $counterId) {
+    //         // Calculate average service time
+    //         $totalServiceTime = $queues->reduce(function ($carry, $queue) {
+    //             $servicedAt = $queue->serviced_at ? Carbon::parse($queue->serviced_at) : null;
+    //             $joinedAt = $queue->joined_at ? Carbon::parse($queue->joined_at) : null;
+    //             return $carry + ($servicedAt ? $servicedAt->diffInSeconds($joinedAt) : 0);
+    //         }, 0);
+
+    //         $averageServiceTime = $totalServiceTime > 0 ? round($totalServiceTime / $queues->count() / 60, 2) : 0;
+
+    //         // Total customers served
+    //         $totalCustomersServed = $queues->count();
+
+    //         // Average waiting time
+    //         $totalWaitingTime = $queues->reduce(function ($carry, $queue) {
+    //             $servicedAt = $queue->serviced_at ? Carbon::parse($queue->serviced_at) : null;
+    //             $joinedAt = $queue->joined_at ? Carbon::parse($queue->joined_at) : null;
+    //             return $carry + ($servicedAt ? $servicedAt->diffInSeconds($queue->created_at) : 0);
+    //         }, 0);
+
+    //         $averageWaitingTime = $totalWaitingTime > 0 ? round($totalWaitingTime / $queues->count() / 60, 2) : 0;
+
+    //         // Total number of counters
+    //         $totalCounters = $counters->count();
+
+    //         // Peak hours
+    //         $peakHours = CustomerQueue::where('department_id', $department->id)
+    //             ->selectRaw('HOUR(created_at) as hour, COUNT(*) as count')
+    //             ->groupBy('hour')
+    //             ->orderBy('count', 'desc')
+    //             ->first();
+
+    //         return [
+    //             'counter_id' => $counterId,
+    //             'average_service_time' => $averageServiceTime,
+    //             'total_customers_served' => $totalCustomersServed,
+    //             'average_waiting_time' => $averageWaitingTime,
+    //             'total_counters' => $totalCounters,
+    //             'peak_hours' => $peakHours,
+    //         ];
+    //     });
+
+    //     // Total number of counters
+    //     $totalCounters = $counters->count();
+
+    //     // Peak hours
+    //     $peakHours = CustomerQueue::where('department_id', $department->id)
+    //         ->selectRaw('HOUR(created_at) as hour, COUNT(*) as count')
+    //         ->groupBy('hour')
+    //         ->orderBy('count', 'desc')
+    //         ->first();
+
+    //     return response()->json([
+    //         'department_id' => $department->id,
+    //         'statistics' => $statistics,
+    //         'total_counters' => $totalCounters,
+    //         'peak_hours' => $peakHours,
+    //     ]);
+    // }
+
+    // admin
+    public function getDepartmentStatistics(Request $request)
+    {
+        // Fetch all departments
+        $departments = Department::all();
+
+        $statistics = $departments->map(function ($department) {
+            // Get statistics for each counter in the department
+            $counters = CustomerQueue::where('department_id', $department->id)
+                ->whereNotNull('counter_id')
+                ->get()
+                ->groupBy('counter_id');
+
+            $totalServiceTime = 0;
+            $totalWaitingTime = 0;
+            $totalCustomersServed = 0;
+
+            foreach ($counters as $counterId => $queues) {
+                // Calculate average service time
+                $totalServiceTime += $queues->reduce(function ($carry, $queue) {
+                    $servicedAt = $queue->serviced_at ? Carbon::parse($queue->serviced_at) : null;
+                    $joinedAt = $queue->joined_at ? Carbon::parse($queue->joined_at) : null;
+                    return $carry + ($servicedAt ? $servicedAt->diffInSeconds($joinedAt) : 0);
+                }, 0);
+
+                // Total customers served
+                $totalCustomersServed += $queues->count();
+
+                // Average waiting time
+                $totalWaitingTime += $queues->reduce(function ($carry, $queue) {
+                    $servicedAt = $queue->serviced_at ? Carbon::parse($queue->serviced_at) : null;
+                    return $carry + ($servicedAt ? $servicedAt->diffInSeconds($queue->created_at) : 0);
+                }, 0);
+            }
+
+            $averageServiceTime = $totalCustomersServed > 0 ? round($totalServiceTime / $totalCustomersServed / 60, 2) : 0;
+            $averageWaitingTime = $totalCustomersServed > 0 ? round($totalWaitingTime / $totalCustomersServed / 60, 2) : 0;
+
+            // Total number of counters
+            $totalCounters = $counters->count();
+
+            // Peak hours
+            $peakHour = CustomerQueue::where('department_id', $department->id)
+                ->selectRaw('HOUR(created_at) as hour, COUNT(*) as count')
+                ->groupBy('hour')
+                ->orderBy('count', 'desc')
+                ->first();
+
+            $peakHourFormatted = $peakHour ? $peakHour->hour : null;
+
+            return [
+                'department_id' => $department->id,
+                'department_name' => $department->name,
+                'total_counters' => $totalCounters,
+                'total_customers_served' => $totalCustomersServed,
+                'average_service_time' => $averageServiceTime,
+                'average_waiting_time' => $averageWaitingTime,
+                'peak_hours' => $peakHourFormatted,
+            ];
+        });
+
+        return response()->json([
+            'statistics' => $statistics,
+        ]);
+    }
 
 }

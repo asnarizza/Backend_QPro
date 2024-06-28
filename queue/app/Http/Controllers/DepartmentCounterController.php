@@ -122,4 +122,7 @@ class DepartmentCounterController extends Controller
         return response()->json($counters, 200);
     }
 
+   
+
+
 }
